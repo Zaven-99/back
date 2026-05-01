@@ -7,6 +7,7 @@ import com.example.testProject.dto.auth.RegisterResponseDTO;
 
 public interface AuthService {
     AuthResponseDTO login(AuthRequestDTO request);
-    RegisterResponseDTO register(RegisterRequestDTO request);
+    RegisterResponseDTO registerUser(RegisterRequestDTO request);
+    RegisterResponseDTO registerBusiness(RegisterRequestDTO request);
 
 }

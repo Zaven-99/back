@@ -1,5 +1,6 @@
 package com.example.testProject.security;
 
+import com.example.testProject.error.ApiError;
 import com.example.testProject.service.CustomUserDetailsService;
 import com.example.testProject.service.JwtService;
 import io.jsonwebtoken.Claims;
@@ -13,7 +14,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
+import java.time.Instant;
 import java.io.IOException;
 
 @Component
@@ -21,11 +24,19 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService customUserDetailsService;
+    private final ObjectMapper objectMapper;
 
-    public JwtFilter(JwtService jwtService, CustomUserDetailsService customUserDetailsService) {
+    public JwtFilter(JwtService jwtService, CustomUserDetailsService customUserDetailsService, ObjectMapper objectMapper) {
         this.jwtService = jwtService;
         this.customUserDetailsService = customUserDetailsService;
+        this.objectMapper = objectMapper;
 
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return path != null && path.startsWith("/auth/");
     }
 
     @Override
@@ -36,8 +47,19 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-         if (header == null || !header.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
+        if (header == null || !header.startsWith("Bearer ")) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+
+            ApiError body = new ApiError(
+                    Instant.now(),
+                    401,
+                    "Unauthorized",
+                    "Missing or invalid Authorization header",
+                    request.getRequestURI()
+            );
+
+            response.getWriter().write(objectMapper.writeValueAsString(body));
             return;
         }
 
@@ -61,8 +83,16 @@ public class JwtFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
 
         } catch (Exception e) {
-            // ❌ если токен битый → 401
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            ApiError body = new ApiError(
+                    Instant.now(),
+                    401,
+                    "Unauthorized",
+                    "Invalid or expired token",
+                    request.getRequestURI()
+            );
+            response.getWriter().write(objectMapper.writeValueAsString(body));
             return;
         }
 

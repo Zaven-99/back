@@ -12,6 +12,8 @@ public class BookingResponseDTO {
     private Long id;
     private Long userId;
     private Long businessId;
+    private Long employeeId;
     private LocalDateTime dateTime;
+    private Double price;
     private BookingStatus status;
 }

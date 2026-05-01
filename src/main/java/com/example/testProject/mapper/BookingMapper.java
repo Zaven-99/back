@@ -1,19 +1,16 @@
 package com.example.testProject.mapper;
 
- import com.example.testProject.dto.booking.BookingResponseDTO;
- import com.example.testProject.entity.Booking;
+import com.example.testProject.dto.booking.BookingResponseDTO;
+import com.example.testProject.entity.Booking;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-public class BookingMapper {
+@Mapper(config = MapStructConfig.class)
+public interface BookingMapper {
 
-    public static BookingResponseDTO toDTO(Booking booking) {
-        BookingResponseDTO dto = new BookingResponseDTO();
-        dto.setId(booking.getId());
-        dto.setDateTime(booking.getDateTime());
-        dto.setStatus(booking.getStatus());
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "businessId", source = "business.id")
+    @Mapping(target = "employeeId", source = "employee.id")
+    BookingResponseDTO toDTO(Booking booking);
 
-        dto.setUserId(booking.getUser().getId());
-        dto.setBusinessId(booking.getBusiness().getId());
-
-        return dto;
-    }
 }

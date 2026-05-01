@@ -1,30 +1,22 @@
 package com.example.testProject.mapper;
 
- import com.example.testProject.dto.business.BusinessRequestDTO;
- import com.example.testProject.dto.business.BusinessResponseDTO;
- import com.example.testProject.entity.Business;
+import com.example.testProject.dto.business.BusinessRequestDTO;
+import com.example.testProject.dto.business.BusinessResponseDTO;
+import com.example.testProject.entity.Business;
+import org.mapstruct.*;
 
-public class BusinessMapper {
+@Mapper(config = MapStructConfig.class)
+public interface BusinessMapper {
 
-    public static Business toEntity(BusinessRequestDTO dto) {
-        Business business = new Business();
-        business.setName(dto.getName());
-        business.setDescription(dto.getDescription());
-        business.setEmail(dto.getEmail());
-        return business;
-    }
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "owner", ignore = true)
+    Business toEntity(BusinessRequestDTO dto);
 
-    public static BusinessResponseDTO toDTO(Business business) {
-        BusinessResponseDTO dto = new BusinessResponseDTO();
-        dto.setId(business.getId());
-        dto.setName(business.getName());
-        dto.setDescription(business.getDescription());
-        dto.setEmail(business.getEmail());
+    @Mapping(target = "ownerId", source = "owner.id")
+    BusinessResponseDTO toDTO(Business business);
 
-        if (business.getOwner() != null) {
-            dto.setOwnerId(business.getOwner().getId());
-        }
-
-        return dto;
-    }
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "owner", ignore = true)
+    void update(BusinessRequestDTO dto, @MappingTarget Business business);
 }

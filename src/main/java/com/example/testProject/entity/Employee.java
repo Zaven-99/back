@@ -7,6 +7,7 @@ import lombok.Setter;
 @Entity
 @Getter
 @Setter
+@Table(name = "employees")
 public class Employee {
 
     @Id
@@ -16,5 +17,6 @@ public class Employee {
     private String name;
 
     @ManyToOne
+    @JoinColumn(name = "business_id", nullable = false)
     private Business business;
 }

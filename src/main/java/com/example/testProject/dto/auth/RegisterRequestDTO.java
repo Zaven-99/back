@@ -1,15 +1,18 @@
 package com.example.testProject.dto.auth;
 
- import com.example.testProject.enums.Role;
- import lombok.Getter;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
 public class RegisterRequestDTO {
 
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be valid")
     private String email;
-    private String password;
 
-     private Role role;
+    @NotBlank(message = "Password is required")
+    private String password;
 }

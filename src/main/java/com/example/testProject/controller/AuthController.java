@@ -5,6 +5,7 @@ import com.example.testProject.dto.auth.AuthResponseDTO;
 import com.example.testProject.dto.auth.RegisterRequestDTO;
 import com.example.testProject.dto.auth.RegisterResponseDTO;
 import com.example.testProject.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,14 +23,17 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthRequestDTO request) {
+    public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody AuthRequestDTO request) {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    @PostMapping("/register")
-    public ResponseEntity<RegisterResponseDTO> register(
-            @RequestBody RegisterRequestDTO request
-    ) {
-        return ResponseEntity.ok(authService.register(request));
+    @PostMapping("/register/user")
+    public ResponseEntity<RegisterResponseDTO> registerUser(@Valid @RequestBody RegisterRequestDTO request) {
+        return ResponseEntity.ok(authService.registerUser(request));
+    }
+
+    @PostMapping("/register/business")
+    public ResponseEntity<RegisterResponseDTO> registerBusiness(@Valid @RequestBody RegisterRequestDTO request) {
+        return ResponseEntity.ok(authService.registerBusiness(request));
     }
 }
