@@ -32,7 +32,10 @@ public class BusinessCrudController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<BusinessResponseDTO> update(@PathVariable Long id, @RequestBody BusinessRequestDTO dto) {
+    public ResponseEntity<BusinessResponseDTO> update(
+            @PathVariable Long id,
+            @RequestBody BusinessRequestDTO dto
+    ) {
         return ResponseEntity.ok(businessService.update(id, dto));
     }
 
@@ -42,4 +45,3 @@ public class BusinessCrudController {
         return ResponseEntity.noContent().build();
     }
 }
-

@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -24,5 +26,12 @@ public class Review {
     @JoinColumn(name = "business_id", nullable = false)
     private Business business;
 
+    private LocalDateTime createdAt;
+
+    // ⭐ автоматическое заполнение даты
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
 
 }

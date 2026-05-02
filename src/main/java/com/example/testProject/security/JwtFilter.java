@@ -1,7 +1,6 @@
 package com.example.testProject.security;
 
-import com.example.testProject.error.ApiError;
-import com.example.testProject.service.CustomUserDetailsService;
+ import com.example.testProject.service.CustomUserDetailsService;
 import com.example.testProject.service.JwtService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -16,8 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
-import java.io.IOException;
+ import java.io.IOException;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -47,19 +45,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
+        // ✅ если нет токена → просто пропускаем дальше
         if (header == null || !header.startsWith("Bearer ")) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-
-            ApiError body = new ApiError(
-                    Instant.now(),
-                    401,
-                    "Unauthorized",
-                    "Missing or invalid Authorization header",
-                    request.getRequestURI()
-            );
-
-            response.getWriter().write(objectMapper.writeValueAsString(body));
+            filterChain.doFilter(request, response);
             return;
         }
 
@@ -68,7 +56,7 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             Claims claims = jwtService.extractClaims(token);
 
-            String email = claims.getSubject(); // теперь subject = email
+            String email = claims.getSubject();
 
             UserDetails userDetails =
                     customUserDetailsService.loadUserByUsername(email);
@@ -83,17 +71,8 @@ public class JwtFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
 
         } catch (Exception e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            ApiError body = new ApiError(
-                    Instant.now(),
-                    401,
-                    "Unauthorized",
-                    "Invalid or expired token",
-                    request.getRequestURI()
-            );
-            response.getWriter().write(objectMapper.writeValueAsString(body));
-            return;
+            // ❗ просто очищаем контекст и идём дальше
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

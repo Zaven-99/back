@@ -1,29 +1,30 @@
 package com.example.testProject.service;
 
-
-import com.example.testProject.dto.booking.BookingRequestDTO;
+ import com.example.testProject.dto.booking.BookingFilterRequestDTO;
+ import com.example.testProject.dto.booking.BookingRequestDTO;
 import com.example.testProject.dto.booking.BookingResponseDTO;
 
 import java.util.List;
 
 public interface BookingService {
 
-    BookingResponseDTO createBooking(BookingRequestDTO dto);
+    BookingResponseDTO createBooking(BookingRequestDTO request);
 
-    List<BookingResponseDTO> getBookingsByUser(Long userId);
-
-    List<BookingResponseDTO> getBookingsByBusiness(Long businessId);
+    List<BookingResponseDTO> getMyBookings();
 
     List<BookingResponseDTO> getBusinessBookings();
 
-    BookingResponseDTO confirmBooking(Long bookingId);
+    BookingResponseDTO getMyBookingById(Long id);
 
-    BookingResponseDTO getById(Long id);
+    BookingResponseDTO update(Long id, BookingRequestDTO request);
 
-    List<BookingResponseDTO> getAll();
-
-    BookingResponseDTO update(Long id, BookingRequestDTO dto);
+    void cancel(Long id);
 
     void delete(Long id);
 
+    BookingResponseDTO confirm(Long id);
+
+    BookingResponseDTO complete(Long id);
+
+    List<BookingResponseDTO> filter(BookingFilterRequestDTO request);
 }

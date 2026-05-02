@@ -1,154 +1,323 @@
 package com.example.testProject.service.serviceImpl;
 
+import com.example.testProject.dto.availability.AvailabilityRequestDTO;
+import com.example.testProject.dto.booking.BookingFilterRequestDTO;
 import com.example.testProject.dto.booking.BookingRequestDTO;
 import com.example.testProject.dto.booking.BookingResponseDTO;
+import com.example.testProject.dto.realtime.DashboardUpdateDTO;
 import com.example.testProject.entity.*;
 import com.example.testProject.enums.BookingStatus;
 import com.example.testProject.mapper.BookingMapper;
-import com.example.testProject.repository.BookingRepository;
-import com.example.testProject.repository.BusinessRepository;
-import com.example.testProject.repository.EmployeeRepository;
-import com.example.testProject.repository.UserRepository;
-import com.example.testProject.security.CustomUserDetails;
+import com.example.testProject.repository.*;
+import com.example.testProject.security.SecurityUtils;
 import com.example.testProject.service.BookingService;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.example.testProject.service.availability.AvailabilityService;
+import com.example.testProject.service.realtime.RealtimeDashboardService;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
-    private final UserRepository userRepository;
     private final BusinessRepository businessRepository;
     private final EmployeeRepository employeeRepository;
     private final BookingMapper bookingMapper;
+    private final RealtimeDashboardService realtimeDashboardService;
+    private final AvailabilityService availabilityService;
 
     public BookingServiceImpl(
             BookingRepository bookingRepository,
-            UserRepository userRepository,
             BusinessRepository businessRepository,
             EmployeeRepository employeeRepository,
-            BookingMapper bookingMapper
+            BookingMapper bookingMapper,
+            RealtimeDashboardService realtimeDashboardService,
+            AvailabilityService availabilityService
     ) {
         this.bookingRepository = bookingRepository;
-        this.userRepository = userRepository;
         this.businessRepository = businessRepository;
         this.employeeRepository = employeeRepository;
         this.bookingMapper = bookingMapper;
+        this.realtimeDashboardService = realtimeDashboardService;
+        this.availabilityService = availabilityService;
     }
 
+    // ================= CREATE =================
     @Override
+    @Transactional
+    public BookingResponseDTO createBooking(BookingRequestDTO request) {
 
-    public BookingResponseDTO createBooking(BookingRequestDTO dto) {
+        User user = SecurityUtils.currentUser();
 
-        String email = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Business business = businessRepository.findById(dto.getBusinessId())
+        Business business = businessRepository.findById(request.getBusinessId())
                 .orElseThrow(() -> new RuntimeException("Business not found"));
 
         Employee employee = null;
-        if (dto.getEmployeeId() != null) {
-            employee = employeeRepository.findById(dto.getEmployeeId())
+        if (request.getEmployeeId() != null) {
+            employee = employeeRepository.findById(request.getEmployeeId())
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
+        }
+
+        AvailabilityRequestDTO availabilityRequest = new AvailabilityRequestDTO();
+        availabilityRequest.setBusinessId(request.getBusinessId());
+        availabilityRequest.setServiceId(request.getServiceId());
+        availabilityRequest.setDate(request.getDateTime().toLocalDate());
+
+        if (!availabilityService.isAvailable(availabilityRequest)) {
+            throw new RuntimeException("Time slot not available");
         }
 
         Booking booking = new Booking();
         booking.setUser(user);
         booking.setBusiness(business);
         booking.setEmployee(employee);
-        booking.setDateTime(dto.getDateTime());
-        booking.setPrice(dto.getPrice());
+        booking.setDateTime(request.getDateTime());
+        booking.setPrice(request.getPrice());
         booking.setStatus(BookingStatus.PENDING);
 
-        return bookingMapper.toDTO(bookingRepository.save(booking));
-    }
-
-    @Override
-    public List<BookingResponseDTO> getBookingsByUser(Long userId) {
-        return bookingRepository.findByUser_Id(userId)
-                .stream()
-                .map(bookingMapper::toDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<BookingResponseDTO> getBookingsByBusiness(Long businessId) {
-        return bookingRepository.findByBusiness_Id(businessId)
-                .stream()
-                .map(bookingMapper::toDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<BookingResponseDTO> getBusinessBookings() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof CustomUserDetails cud)) {
-            throw new RuntimeException("Unauthorized");
-        }
-
-        Business business = businessRepository.findByOwnerId(cud.getUser().getId())
-                .orElseThrow(() -> new RuntimeException("Business not found"));
-
-        return getBookingsByBusiness(business.getId());
-    }
-
-    @Override
-    public BookingResponseDTO confirmBooking(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
-        booking.setStatus(BookingStatus.CONFIRMED);
         Booking saved = bookingRepository.save(booking);
+
+        sendRealtime(business.getId(), "BOOKING_CREATED", bookingMapper.toDTO(saved));
+
         return bookingMapper.toDTO(saved);
     }
 
+    // ================= UPDATE =================
     @Override
-    public BookingResponseDTO getById(Long id) {
-        return bookingRepository.findById(id)
-                .map(bookingMapper::toDTO)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
-    }
-
-    @Override
-    public List<BookingResponseDTO> getAll() {
-        return bookingRepository.findAll().stream().map(bookingMapper::toDTO).toList();
-    }
-
-    @Override
-    public BookingResponseDTO update(Long id, BookingRequestDTO dto) {
+    @Transactional
+    public BookingResponseDTO update(Long id, BookingRequestDTO request) {
 
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        Business business = businessRepository.findById(dto.getBusinessId())
+        Long userId = SecurityUtils.currentUser().getId();
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new RuntimeException("Only pending bookings can be updated");
+        }
+
+        AvailabilityRequestDTO availabilityRequest = new AvailabilityRequestDTO();
+        availabilityRequest.setBusinessId(request.getBusinessId());
+        availabilityRequest.setServiceId(request.getServiceId());
+        availabilityRequest.setDate(request.getDateTime().toLocalDate());
+
+        if (!availabilityService.isAvailable(availabilityRequest)) {
+            throw new RuntimeException("Time slot not available");
+        }
+
+        Business business = businessRepository.findById(request.getBusinessId())
                 .orElseThrow(() -> new RuntimeException("Business not found"));
 
         Employee employee = null;
-        if (dto.getEmployeeId() != null) {
-            employee = employeeRepository.findById(dto.getEmployeeId())
+        if (request.getEmployeeId() != null) {
+            employee = employeeRepository.findById(request.getEmployeeId())
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
         }
 
         booking.setBusiness(business);
         booking.setEmployee(employee);
-        booking.setDateTime(dto.getDateTime());
-        booking.setPrice(dto.getPrice());
-
-        // ❗ user НЕ трогаем вообще
+        booking.setDateTime(request.getDateTime());
+        booking.setPrice(request.getPrice());
 
         Booking saved = bookingRepository.save(booking);
+
+        sendRealtime(business.getId(), "BOOKING_UPDATED", bookingMapper.toDTO(saved));
+
         return bookingMapper.toDTO(saved);
     }
 
+    // ================= REALTIME =================
+    private void sendRealtime(Long businessId, String type, Object payload) {
+        DashboardUpdateDTO update = new DashboardUpdateDTO();
+        update.setBusinessId(businessId);
+        update.setType(type);
+        update.setPayload(payload);
+
+        realtimeDashboardService.sendUpdate(update);
+    }
+
+    // ================= GET MY BOOKINGS =================
     @Override
+    public List<BookingResponseDTO> getMyBookings() {
+
+        Long userId = SecurityUtils.currentUser().getId();
+
+        return bookingRepository.findByUser_Id(userId)
+                .stream()
+                .map(bookingMapper::toDTO)
+                .toList();
+    }
+
+    // ================= BUSINESS BOOKINGS =================
+    @Override
+    public List<BookingResponseDTO> getBusinessBookings() {
+
+        User user = SecurityUtils.currentUser();
+
+        Business business = businessRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Business not found"));
+
+        return bookingRepository.findByBusiness_Id(business.getId())
+                .stream()
+                .map(bookingMapper::toDTO)
+                .toList();
+    }
+
+    // ================= GET BY ID =================
+    @Override
+    public BookingResponseDTO getMyBookingById(Long id) {
+
+        Long userId = SecurityUtils.currentUser().getId();
+
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden");
+        }
+
+        return bookingMapper.toDTO(booking);
+    }
+
+    // ================= CANCEL =================
+    @Override
+    @Transactional
+    public void cancel(Long id) {
+
+        Long userId = SecurityUtils.currentUser().getId();
+
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELED) {
+            throw new RuntimeException("Already cancelled");
+        }
+
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new RuntimeException("Cannot cancel completed booking");
+        }
+
+        booking.setStatus(BookingStatus.CANCELED);
+        bookingRepository.save(booking);
+
+        sendRealtime(booking.getBusiness().getId(), "BOOKING_CANCELLED", bookingMapper.toDTO(booking));
+    }
+
+    // ================= DELETE =================
+    @Override
+    @Transactional
     public void delete(Long id) {
-        bookingRepository.deleteById(id);
+
+        Long userId = SecurityUtils.currentUser().getId();
+
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden");
+        }
+
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new RuntimeException("Cannot delete completed booking");
+        }
+
+        bookingRepository.delete(booking);
+
+        sendRealtime(booking.getBusiness().getId(), "BOOKING_DELETED", id);
+    }
+
+    // ================= CONFIRM =================
+    @Override
+    @Transactional
+    public BookingResponseDTO confirm(Long id) {
+
+        Long userId = SecurityUtils.currentUser().getId();
+
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!booking.getBusiness().getOwner().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new RuntimeException("Only pending bookings can be confirmed");
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+
+        Booking saved = bookingRepository.save(booking);
+
+        sendRealtime(booking.getBusiness().getId(), "BOOKING_CONFIRMED", bookingMapper.toDTO(saved));
+
+        return bookingMapper.toDTO(saved);
+    }
+
+    // ================= COMPLETE =================
+    @Override
+    @Transactional
+    public BookingResponseDTO complete(Long id) {
+
+        Long userId = SecurityUtils.currentUser().getId();
+
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!booking.getBusiness().getOwner().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden");
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Only confirmed bookings can be completed");
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+
+        Booking saved = bookingRepository.save(booking);
+
+        sendRealtime(booking.getBusiness().getId(), "BOOKING_COMPLETED", bookingMapper.toDTO(saved));
+
+        return bookingMapper.toDTO(saved);
+    }
+
+    // ================= FILTER =================
+    @Override
+    public List<BookingResponseDTO> filter(BookingFilterRequestDTO request) {
+
+        return bookingRepository.findAll().stream()
+                .filter(b -> request.getBusinessId() == null ||
+                        b.getBusiness().getId().equals(request.getBusinessId()))
+
+                .filter(b -> request.getEmployeeId() == null ||
+                        (b.getEmployee() != null &&
+                                b.getEmployee().getId().equals(request.getEmployeeId())))
+
+                .filter(b -> request.getStatus() == null ||
+                        b.getStatus().name().equals(request.getStatus()))
+
+                .filter(b -> request.getMinPrice() == null ||
+                        b.getPrice() >= request.getMinPrice())
+
+                .filter(b -> request.getMaxPrice() == null ||
+                        b.getPrice() <= request.getMaxPrice())
+
+                .filter(b -> request.getFromDate() == null ||
+                        !b.getDateTime().toLocalDate().isBefore(request.getFromDate()))
+
+                .filter(b -> request.getToDate() == null ||
+                        !b.getDateTime().toLocalDate().isAfter(request.getToDate()))
+
+                .map(bookingMapper::toDTO)
+                .toList();
     }
 }

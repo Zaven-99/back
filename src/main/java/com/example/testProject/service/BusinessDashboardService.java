@@ -6,8 +6,8 @@ import com.example.testProject.entity.User;
 import com.example.testProject.enums.BookingStatus;
 import com.example.testProject.repository.BookingRepository;
 import com.example.testProject.repository.BusinessRepository;
-import com.example.testProject.security.CustomUserDetails;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.example.testProject.repository.ReviewRepository;
+import com.example.testProject.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,17 +15,21 @@ public class BusinessDashboardService {
 
     private final BookingRepository bookingRepository;
     private final BusinessRepository businessRepository;
+    private final ReviewRepository reviewRepository;
 
-    public BusinessDashboardService(BookingRepository bookingRepository,
-                                    BusinessRepository businessRepository) {
+    public BusinessDashboardService(
+            BookingRepository bookingRepository,
+            BusinessRepository businessRepository,
+            ReviewRepository reviewRepository
+    ) {
         this.bookingRepository = bookingRepository;
         this.businessRepository = businessRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     public BusinessDashboardDTO getDashboard() {
 
-        User user = ((CustomUserDetails) SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal()).getUser();
+        User user = SecurityUtils.currentUser();
 
         Business business = businessRepository.findByOwnerId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Business not found"));
@@ -38,13 +42,16 @@ public class BusinessDashboardService {
 
         Long clients = bookingRepository.getUniqueClients(business.getId());
 
+        Double avgRating = reviewRepository.getAverageRating(business.getId());
+        long reviewsCount = reviewRepository.countByBusiness_Id(business.getId());
+
         BusinessDashboardDTO dto = new BusinessDashboardDTO();
         dto.setBusinessName(business.getName());
-        dto.setTodayBookings(pendingBookings);
-        dto.setRevenueToday(revenue);
-        dto.setAverageRating(0.0); // позже через Review
-        dto.setTotalClients(clients);
         dto.setPendingBookings(pendingBookings);
+        dto.setRevenueToday(revenue);
+        dto.setTotalClients(clients);
+        dto.setAverageRating(avgRating);
+        dto.setReviewsCount(reviewsCount);
 
         return dto;
     }

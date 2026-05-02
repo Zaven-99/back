@@ -16,11 +16,32 @@ public class UserCrudController {
 
     private final UserService userService;
 
+    // REGISTER
     @PostMapping
     public ResponseEntity<UserResponseDTO> create(@RequestBody UserRequestDTO dto) {
         return ResponseEntity.ok(userService.create(dto));
     }
 
+    // GET CURRENT USER (JWT)
+    @GetMapping("/me")
+    public ResponseEntity<UserResponseDTO> me() {
+        return ResponseEntity.ok(userService.getCurrentUser());
+    }
+
+    // UPDATE CURRENT USER (JWT)
+    @PutMapping("/me")
+    public ResponseEntity<UserResponseDTO> updateMe(@RequestBody UserRequestDTO dto) {
+        return ResponseEntity.ok(userService.updateCurrentUser(dto));
+    }
+
+    // DELETE CURRENT USER (JWT)
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteMe() {
+        userService.deleteCurrentUser();
+        return ResponseEntity.noContent().build();
+    }
+
+    // ADMIN / DEV ONLY
     @GetMapping("/{id}")
     public ResponseEntity<UserResponseDTO> getById(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getById(id));
@@ -32,7 +53,8 @@ public class UserCrudController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> update(@PathVariable Long id, @RequestBody UserRequestDTO dto) {
+    public ResponseEntity<UserResponseDTO> update(@PathVariable Long id,
+                                                  @RequestBody UserRequestDTO dto) {
         return ResponseEntity.ok(userService.update(id, dto));
     }
 
@@ -42,4 +64,3 @@ public class UserCrudController {
         return ResponseEntity.noContent().build();
     }
 }
-

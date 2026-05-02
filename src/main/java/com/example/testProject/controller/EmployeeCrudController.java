@@ -27,7 +27,9 @@ public class EmployeeCrudController {
     }
 
     @GetMapping
-    public ResponseEntity<List<EmployeeResponseDTO>> getAll(@RequestParam(required = false) Long businessId) {
+    public ResponseEntity<List<EmployeeResponseDTO>> getAll(
+            @RequestParam(required = false) Long businessId
+    ) {
         if (businessId != null) {
             return ResponseEntity.ok(employeeService.getByBusiness(businessId));
         }
@@ -35,7 +37,10 @@ public class EmployeeCrudController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EmployeeResponseDTO> update(@PathVariable Long id, @RequestBody EmployeeRequestDTO dto) {
+    public ResponseEntity<EmployeeResponseDTO> update(
+            @PathVariable Long id,
+            @RequestBody EmployeeRequestDTO dto
+    ) {
         return ResponseEntity.ok(employeeService.update(id, dto));
     }
 
@@ -45,4 +50,3 @@ public class EmployeeCrudController {
         return ResponseEntity.noContent().build();
     }
 }
-

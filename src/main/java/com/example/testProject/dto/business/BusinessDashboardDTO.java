@@ -7,9 +7,10 @@ import lombok.Setter;
 @Setter
 public class BusinessDashboardDTO {
     private String businessName;
-    private Long todayBookings;
-    private Double revenueToday;
-    private Double averageRating;
-    private Long totalClients;
     private Long pendingBookings;
+    private Double revenueToday;
+    private Long totalClients;
+
+    private Double averageRating;
+    private Long reviewsCount;
 }

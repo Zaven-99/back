@@ -9,12 +9,10 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class BookingRequestDTO {
-    @NotNull
     private Long businessId;
-    @NotNull
+    private Long serviceId;
     private Long employeeId;
-    @NotNull
+
     private LocalDateTime dateTime;
-    @NotNull
     private Double price;
 }

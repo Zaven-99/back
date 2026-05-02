@@ -5,8 +5,6 @@ import com.example.testProject.dto.auth.AuthResponseDTO;
 import com.example.testProject.dto.auth.RegisterRequestDTO;
 import com.example.testProject.dto.auth.RegisterResponseDTO;
 import com.example.testProject.entity.User;
-import com.example.testProject.error.NotFoundException;
-import com.example.testProject.error.UnauthorizedException;
 import com.example.testProject.enums.Role;
 import com.example.testProject.repository.UserRepository;
 import com.example.testProject.service.AuthService;
@@ -21,25 +19,31 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
-
-    public AuthServiceImpl(UserRepository userRepository, JwtService jwtService, PasswordEncoder passwordEncoder) {
+    public AuthServiceImpl(UserRepository userRepository,
+                           JwtService jwtService,
+                           PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
     }
 
+    // LOGIN
     @Override
-
     public AuthResponseDTO login(AuthRequestDTO request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new NotFoundException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new UnauthorizedException("Wrong password");
+            throw new RuntimeException("Wrong password");
         }
 
-        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
+        // 🔥 теперь лучше передавать ID + email
+        String token = jwtService.generateToken(
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name()
+        );
 
         AuthResponseDTO response = new AuthResponseDTO();
         response.setToken(token);
@@ -52,17 +56,30 @@ public class AuthServiceImpl implements AuthService {
         return response;
     }
 
+    // USER REGISTER
     @Override
     public RegisterResponseDTO registerUser(RegisterRequestDTO request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email already used");
+        }
+
         return registerWithRole(request, Role.USER);
     }
 
+    // BUSINESS REGISTER
     @Override
     public RegisterResponseDTO registerBusiness(RegisterRequestDTO request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email already used");
+        }
+
         return registerWithRole(request, Role.BUSINESS);
     }
 
     private RegisterResponseDTO registerWithRole(RegisterRequestDTO request, Role role) {
+
         User user = new User();
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -74,6 +91,7 @@ public class AuthServiceImpl implements AuthService {
         response.setUserId(saved.getId());
         response.setEmail(saved.getEmail());
         response.setRole(saved.getRole());
+
         return response;
     }
 }

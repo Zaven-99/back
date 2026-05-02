@@ -36,4 +36,7 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     private BookingStatus status;
 
+    @ManyToOne
+    private ServiceEntity service;
+
 }
